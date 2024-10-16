@@ -1,3 +1,3 @@
-# event-management
-event management service
+# Multi-Tenancy
+Multi Tenancy in FastAPI
 
