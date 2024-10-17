@@ -2,7 +2,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from fastapi import Request, HTTPException
 
-DATABASE_URL = "postgresql+asyncpg://fastapi_user:123456@localhost/fastapi_db"
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://fastapi_user:123456@db:5432/fastapi_db")
+
+# DATABASE_URL = "postgresql+asyncpg://fastapi_user:123456@localhost:5432/fastapi_db"
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)

@@ -3,6 +3,5 @@ uvicorn
 sqlalchemy
 asyncpg
 pydantic
-flyway
 httpx
 psycopg2-binary
