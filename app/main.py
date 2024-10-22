@@ -32,3 +32,16 @@ async def delete_item(item_id: int, db: AsyncSession = Depends(database.get_tena
     if deleted_item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return deleted_item
+
+
+@app.get("/some-endpoint")
+async def some_endpoint(request: Request, session: AsyncSession = Depends(database.get_tenant_db)):
+    # Extract the tenant from the request headers or subdomain
+    host = request.headers.get("host")
+    subdomain = host.split(".")[0] if host else None
+
+    if not subdomain:
+        raise HTTPException(status_code=400, detail="Invalid subdomain")
+
+    # Return a success message and the schema/tenant in use
+    return {"message": "Success", "tenant": subdomain}
