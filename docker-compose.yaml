@@ -10,19 +10,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
-
-  web:
-    build: .
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    volumes:
-      - ./app:/app
-    environment:
-      DATABASE_URL: "postgresql+asyncpg://fastapi_user:123456@db:5432/fastapi_db"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - "5433:5432"  # Exposing port 5432 from the container to 5433 on the host
 
   flyway:
     image: flyway/flyway:latest
@@ -31,9 +19,9 @@ services:
       FLYWAY_USER: fastapi_user
       FLYWAY_PASSWORD: 123456
     volumes:
-      - ./db/migration:/flyway/sql
+      - ./db/migration:/flyway/sql  # Pointing to your migration SQL files
     depends_on:
-      - db
+      - db  # Ensures the `db` service starts before Flyway runs
 
 volumes:
   pg_data:
