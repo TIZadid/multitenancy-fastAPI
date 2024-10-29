@@ -19,8 +19,8 @@ This repository contains a FastAPI project that implements schema-based multi-te
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/yourusername/yourrepo.git
-cd yourrepo
+git clone https://github.com/TIZadid/multitenancy-fastAPI.git
+cd multitenancy-fastAPI
 ```
 
 ### Step 2: Set Up Docker for PostgreSQL and Flyway
