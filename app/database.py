@@ -26,7 +26,7 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 # Middleware to inject tenant schema from subdomain
-async def get_tenant_db(request: Request):
+async def get_tenant_db_subdomain(request: Request):
     host = request.headers.get("host")
     subdomain = host.split(".")[0] if host else None
 
@@ -37,3 +37,19 @@ async def get_tenant_db(request: Request):
 
     async with SessionLocal(bind=schema_engine) as session:
         yield session
+
+
+
+# Dependency to provide the session
+async def get_db_session_header(request: Request) -> AsyncSession:
+    # Extract tenant ID from the header
+    tenant_id = request.headers.get("X-Tenant-ID")
+    if not tenant_id or tenant_id not in ["tenant1", "tenant2"]:
+        raise HTTPException(status_code=400, detail="Invalid or missing tenant ID")
+
+    # Configure schema mapping for the tenant
+    schema_engine = engine.execution_options(schema_translate_map={None: tenant_id})
+
+    async with SessionLocal(bind=schema_engine) as session:
+        yield session
+

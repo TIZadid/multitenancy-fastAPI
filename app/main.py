@@ -1,10 +1,12 @@
 # main.py
 import uvicorn
 from fastapi import FastAPI
+
+from app.middleware import TenantMiddleware
 from route import router
 
 app = FastAPI()
-
+app.add_middleware(TenantMiddleware)
 # Include routes from the `routes.py` file
 app.include_router(router)
 
