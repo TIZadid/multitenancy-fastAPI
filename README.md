@@ -1,72 +1,110 @@
 
 # Multi-Tenant FastAPI Project
 
-This repository contains a FastAPI project that implements schema-based multi-tenancy using PostgreSQL. Each tenant's data is isolated within its own schema, identified by subdomains (e.g., `tenant1.localhost.com/items`). Flyway is used for managing database migrations, and Docker is used to set up PostgreSQL and Flyway. The FastAPI application itself runs outside of Docker.
+This project demonstrates schema-based multi-tenancy using PostgreSQL with two types of tenant identification: 
+1. **Header-Based Tenant Identification**
+2. **Subdomain-Based Tenant Identification**
 
-## Features
+And two methods for implementing these identifications:
+- **Middleware**
+- **Dependency Injection**
 
-- **Multi-Tenancy**: Tenant data is isolated in separate schemas within PostgreSQL.
-- **Subdomain-Based Tenant Identification**: Routes are configured based on subdomains, allowing tenants to be dynamically identified.
-- **Data Migration**: Managed with Flyway to ensure schemas are up-to-date.
+## Key Commands to Run the Project
 
-## Prerequisites
+1. **Install Dependencies**:
+    ```bash
+    poetry install
+    ```
 
-- [Docker](https://www.docker.com/)
-- [Python 3.10+](https://www.python.org/downloads/)
-- [Poetry](https://python-poetry.org/) for dependency management
-
-## Setup and Running the Application
-
-### Step 1: Clone the Repository
-```bash
-git clone https://github.com/TIZadid/multitenancy-fastAPI.git
-cd multitenancy-fastAPI
-```
-
-### Step 2: Set Up Docker for PostgreSQL and Flyway
-
-1. **Run PostgreSQL and Flyway with Docker Compose**:
+2. **Run PostgreSQL and Apply Migrations**:
     ```bash
     docker compose up -d
-    ```
-   This command initializes PostgreSQL and Flyway containers.
-
-2. **Database Migration with Flyway**:
-    ```bash
     docker compose run flyway migrate
     ```
-   This command applies all pending migrations to your PostgreSQL database.
 
-### Step 3: Configure `/etc/hosts` for Local Testing
+3. **Start the FastAPI Application**:
+    ```bash
+    python app/main.py
+    ```
 
-To enable subdomain-based routing for tenant identification on localhost, add the following to your `/etc/hosts` file:
+4. **Configure /etc/hosts for Subdomain Testing**:
+    Add the following lines to your `/etc/hosts` file:
+    ```plaintext
+    127.0.0.1 tenant1.localhost.com
+    127.0.0.1 tenant2.localhost.com
+    ```
+    This allows testing subdomain routing locally by mapping the custom subdomains to localhost.
 
-```plaintext
-127.0.0.1 tenant1.localhost.com
-127.0.0.1 tenant2.localhost.com
-# Add more tenants as needed
+## Approaches to Multi-Tenancy
+
+Both the Header-Based and Subdomain-Based tenant identification types can be implemented using either Middleware or Dependency Injection methods. In this project, the following combinations are used as examples:
+
+- **routes_dependancy.py**: Implements Subdomain-Based Tenant Identification using Dependency Injection.
+- **routes.py**: Implements Header-Based Tenant Identification using Middleware.
+
+### 1. Header-Based Tenant Identification (Middleware)
+
+The `TenantMiddleware` class dynamically sets the database schema based on the `X-Tenant-ID` header.
+
+#### Code Overview:
+```python
+class TenantMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        tenant_id = request.headers.get("X-Tenant-ID")
+        if not tenant_id or tenant_id not in ["tenant1", "tenant2"]:
+            raise HTTPException(status_code=400, detail="Invalid or missing tenant ID")
+
+        schema_engine = engine.execution_options(schema_translate_map={None: tenant_id})
+        tenant_session = sessionmaker(bind=schema_engine, class_=AsyncSession, expire_on_commit=False)
+        request.state.db = tenant_session()
+
+        try:
+            response = await call_next(request)
+        finally:
+            await request.state.db.close()
+
+        return response
 ```
 
-### Step 4: Install Dependencies
+#### How It Works:
+- Extracts the tenant ID from the `X-Tenant-ID` header.
+- Validates the tenant ID and configures the database engine to use the corresponding schema.
+- Attaches the tenant-specific session to `request.state.db`.
+- Ensures the session is closed after the request is processed.
 
-Use Poetry to install the project dependencies:
-
-
+#### Example cURL Request:
 ```bash
-poetry install
+curl -X GET http://localhost:8000/items/ -H "X-Tenant-ID: tenant1"
 ```
 
-### Step 5: Run the FastAPI Application
+### 2. Subdomain-Based Tenant Identification (Dependency Injection)
 
-With Docker running PostgreSQL and migrations applied, start the FastAPI application by running the main function in main.py,
+The `get_tenant_db_subdomain` function dynamically sets the database schema based on the subdomain in the URL.
 
+#### Code Overview:
+```python
+async def get_tenant_db_subdomain(request: Request):
+    host = request.headers.get("host")
+    subdomain = host.split(".")[0] if host else None
+
+    if subdomain not in ["tenant1", "tenant2"]:
+        raise HTTPException(status_code=400, detail="Invalid tenant")
+
+    schema_engine = engine.execution_options(schema_translate_map={None: subdomain})
+
+    async with SessionLocal(bind=schema_engine) as session:
+        yield session
+```
+
+#### How It Works:
+- Extracts the subdomain from the `Host` header in the request.
+- Validates the subdomain and configures the database engine for the corresponding schema.
+- Returns a session specific to the tenant schema.
+
+#### Example cURL Request:
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+curl -X GET http://tenant1.localhost.com:8000/items/
 ```
-
-The application is now accessible. For example:
-- `http://tenant1.localhost.com:8000/items` to access items for `tenant1`.
-- `http://tenant2.localhost.com:8000/items` to access items for `tenant2`.
 
 ## Directory Structure
 
@@ -76,7 +114,5 @@ The application is now accessible. For example:
 
 ## Additional Notes
 
-- **Database Migrations**: Create new Flyway migration scripts in the `db/migrations` folder following Flyway’s naming conventions.
-- **Testing**: Ensure `/etc/hosts` is correctly configured for each tenant subdomain.
-
-
+- Ensure Docker and Poetry are installed on your system.
+- Test subdomain routing locally by correctly configuring `/etc/hosts`.
